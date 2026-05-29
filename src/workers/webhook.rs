@@ -23,7 +23,7 @@ pub async fn run(state: Arc<AppState>) {
             }
             _ => {}
         }
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(state.settings.webhook_poll_interval_secs)).await;
     }
 }
 

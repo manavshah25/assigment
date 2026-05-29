@@ -12,7 +12,7 @@ Minimal, correct invoice and payment backend built with Rust, Axum, and PostgreS
 docker compose up --build
 ```
 
-Service available at `http://localhost:8080`.
+Service available at `http://localhost:8080`. No manual steps required.
 
 ## Authentication
 
@@ -76,34 +76,50 @@ curl -X POST http://localhost:8080/api/invoices/<invoice_id>/pay \
 | `tok_insufficient_funds` | Returns `failed` with code `insufficient_funds` |
 | `tok_card_declined` | Returns `failed` with code `card_declined` |
 | `tok_timeout` | Sleeps 30s (our client times out at 10s) |
-| `tok_network_error` | Returns error response |
+| `tok_network_error` | Returns HTTP 500 |
 
 ## Running Tests
 
 ```bash
+# Option 1: All in Docker (no local Rust needed)
+docker compose --profile test up --build
+
+# Option 2: Locally (requires Rust installed)
 docker compose up -d
-cargo test --test payment_tests
+cargo test --test payment_tests -- --nocapture
 ```
+
+### Required Tests (from spec)
+
+| Test | What it proves |
+|------|---------------|
+| `test_concurrent_payments_no_double_charge` | 10 concurrent POST /pay → exactly 1 succeeds, rest get 409 |
+| `test_idempotency_returns_cached_response` | Same key = same payment_id, different payload = 422 |
+| `test_psp_failure_does_not_corrupt_state` | tok_timeout → invoice `failed` (not stuck), retry succeeds |
 
 ## Project Structure
 
 ```
 src/
 ├── main.rs              # Bootstrap
-├── config/              # Database connection, app state
+├── config/
+│   ├── settings.rs      # All env vars (like Django settings.py)
+│   ├── database.rs      # Pool + migrations
+│   └── state.rs         # AppState (shared across handlers)
 ├── router.rs            # Route tree + middleware layers
-├── response.rs          # Common success response wrapper
-├── errors.rs            # Common error response + AppError enum
-├── extractors.rs        # Custom JSON extractor (validation errors)
-├── validators/          # Input validation (regex, lengths, rules)
-├── db/                  # SQL queries (repository layer)
+├── response.rs          # Common success wrapper {"status":"success","data":...}
+├── errors.rs            # Common error enum {"status":"error","error":{...}}
+├── extractors.rs        # Custom JSON extractor (clean validation errors)
+├── validators/          # Input validation (regex email, field rules)
+├── db/                  # SQL queries only (repository layer)
 ├── services/            # Business logic (orchestration)
 ├── routes/              # Thin HTTP handlers
-├── middleware/          # Auth (token + API key validation)
+├── middleware/          # Auth (token + API key)
 ├── models/              # Data types + state machine
 └── workers/             # Background webhook delivery
 mock-psp/src/main.rs     # Simulated payment processor
 migrations/001_init.sql  # Database schema
+tests/payment_tests.rs   # 3 required integration tests
 ```
 
 ## Key Design Decisions
@@ -116,5 +132,6 @@ migrations/001_init.sql  # Database schema
 6. **Idempotency with payload hash** — detects key reuse with different requests
 7. **Webhook outbox** — atomic with payment state, delivered async
 8. **Two-tier auth** — API key → session token, both SHA256-hashed
+9. **Centralized settings** — all config from env vars, no scattered `env::var()` calls
 
 See [DESIGN.md](./DESIGN.md) for detailed architecture decisions and failure analysis.

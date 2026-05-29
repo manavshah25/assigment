@@ -1,12 +1,10 @@
 use sqlx::{PgPool, postgres::PgPoolOptions};
+use crate::config::settings::Settings;
 
-pub async fn connect() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/invoices".into());
-
+pub async fn connect(settings: &Settings) -> PgPool {
     let pool = PgPoolOptions::new()
-        .max_connections(10)
-        .connect(&url)
+        .max_connections(settings.max_db_connections)
+        .connect(&settings.database_url)
         .await
         .expect("Failed to connect to database");
 

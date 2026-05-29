@@ -15,9 +15,9 @@ struct PspResponse {
     code: Option<String>,
 }
 
-pub async fn charge(psp_url: &str, amount_cents: i64, token: &str) -> Result<String, PspError> {
+pub async fn charge(psp_url: &str, amount_cents: i64, token: &str, timeout_secs: u64) -> Result<String, PspError> {
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(timeout_secs))
         .build()
         .map_err(|e| PspError::NetworkError(e.to_string()))?;
 

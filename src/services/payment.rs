@@ -30,7 +30,7 @@ pub async fn check_idempotency(
 }
 
 pub async fn execute(
-    pool: &PgPool, psp_url: &str, business_id: Uuid, invoice_id: Uuid, payment_token: &str,
+    pool: &PgPool, psp_url: &str, psp_timeout_secs: u64, business_id: Uuid, invoice_id: Uuid, payment_token: &str,
 ) -> Result<PaymentResponse, AppError> {
     // TX1: Lock invoice, validate state, create payment attempt
     let mut tx = pool.begin().await?;
@@ -53,7 +53,7 @@ pub async fn execute(
     tx.commit().await?; // Release lock before PSP call
 
     // PSP call (outside transaction)
-    let psp_result = psp::charge(psp_url, amount_cents, payment_token).await;
+    let psp_result = psp::charge(psp_url, amount_cents, payment_token, psp_timeout_secs).await;
 
     let (pay_status, inv_status, failure_reason, psp_txn_id) = match psp_result {
         Ok(txn_id) => (PaymentStatus::Succeeded, InvoiceStatus::Paid, None, Some(txn_id)),

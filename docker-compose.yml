@@ -40,5 +40,17 @@ services:
       mock-psp:
         condition: service_started
 
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      TEST_BASE_URL: http://api:8080
+    depends_on:
+      api:
+        condition: service_started
+    profiles:
+      - test
+
 volumes:
   pgdata:

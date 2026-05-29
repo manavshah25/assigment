@@ -12,9 +12,9 @@ mod validators;
 mod workers;
 
 use std::sync::Arc;
+use config::{settings::Settings, state::AppState};
 
-// Re-export so all modules can use `crate::AppState`
-pub use config::state::AppState;
+pub use config::state::AppState as AppState;
 
 #[tokio::main]
 async fn main() {
@@ -22,14 +22,17 @@ async fn main() {
         .with_env_filter("invoice_service=debug,tower_http=debug")
         .init();
 
-    let pool = config::database::connect().await;
-    let state = Arc::new(AppState::new(pool));
+    let settings = Settings::from_env();
+    let addr = settings.server_addr();
+
+    let pool = config::database::connect(&settings).await;
+    let state = Arc::new(AppState::new(pool, settings));
 
     tokio::spawn(workers::webhook::run(state.clone()));
 
     let app = router::build(state);
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
 
-    tracing::info!("Server running on :8080");
+    tracing::info!("Server running on {}", addr);
     axum::serve(listener, app).await.unwrap();
 }

@@ -41,7 +41,7 @@ async fn pay(
         }
     }
 
-    let data = payment::execute(&state.db, &state.psp_url, auth.business_id, invoice_id, token).await?;
+    let data = payment::execute(&state.db, &state.settings.psp_url, state.settings.psp_timeout_secs, auth.business_id, invoice_id, token).await?;
 
     if let Some(ref key) = idempotency_key {
         payment::store_idempotency_response(&state.db, auth.business_id, key, invoice_id, &request_hash, &data).await;

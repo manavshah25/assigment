@@ -1,4 +1,4 @@
-use axum::{routing::post, Json, Router};
++use axum::{routing::post, http::StatusCode, Json, Router};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -17,57 +17,53 @@ struct ChargeResponse {
     code: Option<String>,
 }
 
-async fn charge(Json(req): Json<ChargeRequest>) -> Json<ChargeResponse> {
+async fn charge(Json(req): Json<ChargeRequest>) -> Result<Json<ChargeResponse>, StatusCode> {
     tracing::info!("PSP charge: {} cents, token={}", req.amount_cents, req.token);
 
     match req.token.as_str() {
         "tok_success" => {
             tokio::time::sleep(Duration::from_millis(100)).await;
-            Json(ChargeResponse {
+            Ok(Json(ChargeResponse {
                 status: "succeeded".into(),
                 psp_ref: Some(uuid::Uuid::new_v4().to_string()),
                 code: None,
-            })
+            }))
         }
         "tok_insufficient_funds" => {
             tokio::time::sleep(Duration::from_millis(100)).await;
-            Json(ChargeResponse {
+            Ok(Json(ChargeResponse {
                 status: "failed".into(),
                 psp_ref: None,
                 code: Some("insufficient_funds".into()),
-            })
+            }))
         }
         "tok_card_declined" => {
             tokio::time::sleep(Duration::from_millis(100)).await;
-            Json(ChargeResponse {
+            Ok(Json(ChargeResponse {
                 status: "failed".into(),
                 psp_ref: None,
                 code: Some("card_declined".into()),
-            })
+            }))
         }
         "tok_timeout" => {
-            // Simulates a very slow PSP response — 30s sleep then success
+            // Sleeps 30s then returns success (our service times out at 10s)
             tokio::time::sleep(Duration::from_secs(30)).await;
-            Json(ChargeResponse {
+            Ok(Json(ChargeResponse {
                 status: "succeeded".into(),
                 psp_ref: Some(uuid::Uuid::new_v4().to_string()),
                 code: None,
-            })
+            }))
         }
         "tok_network_error" => {
-            // Return 500-like response body
-            Json(ChargeResponse {
-                status: "error".into(),
-                psp_ref: None,
-                code: Some("internal_error".into()),
-            })
+            // Returns HTTP 500 — simulates PSP infrastructure failure
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
         _ => {
-            Json(ChargeResponse {
+            Ok(Json(ChargeResponse {
                 status: "failed".into(),
                 psp_ref: None,
                 code: Some("unknown_token".into()),
-            })
+            }))
         }
     }
 }

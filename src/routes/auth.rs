@@ -79,9 +79,10 @@ pub async fn create_token(
         hex::encode(h.finalize())
     };
 
+    let expiry_hours = state.settings.token_expiry_hours;
+
     sqlx::query(
-        "INSERT INTO auth_tokens (business_id, token_hash, expires_at)
-         VALUES ($1, $2, now() + INTERVAL '24 hours')"
+        &format!("INSERT INTO auth_tokens (business_id, token_hash, expires_at) VALUES ($1, $2, now() + INTERVAL '{} hours')", expiry_hours)
     )
     .bind(business_id)
     .bind(&token_hash)
@@ -99,7 +100,7 @@ pub async fn create_token(
             "token": token,
             "token_type": "Bearer",
             "business_id": business_id,
-            "expires_in": 86400
+            "expires_in": expiry_hours * 3600
         }
     })))
 }

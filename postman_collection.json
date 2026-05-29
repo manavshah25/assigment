@@ -1,0 +1,247 @@
+{
+  "info": {
+    "name": "Invoice & Payment Service",
+    "description": "## How to use\n1. Run 'Get Token' first — it auto-sets {{token}} variable\n2. Run 'Create Customer' — sets {{customer_id}}\n3. Run 'Create Invoice' — sets {{invoice_id}}\n4. All other requests use these variables automatically\n\n## Setup\ndocker compose up --build\nAPI Key: sk_test_abc123",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080" },
+    { "key": "api_key", "value": "sk_test_abc123" },
+    { "key": "token", "value": "" },
+    { "key": "customer_id", "value": "" },
+    { "key": "invoice_id", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Get Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.status === 'success') {",
+                  "    pm.collectionVariables.set('token', json.data.token);",
+                  "    pm.test('Token issued', function() {",
+                  "        pm.expect(json.data.token).to.match(/^tok_/);",
+                  "        pm.expect(json.data.token_type).to.eql('Bearer');",
+                  "    });",
+                  "    console.log('Token set: ' + json.data.token);",
+                  "} else {",
+                  "    pm.test('Auth failed: ' + JSON.stringify(json), function() {",
+                  "        pm.expect.fail('Token not issued');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "X-API-Key", "value": "{{api_key}}" }],
+            "url": { "raw": "{{base_url}}/api/auth/token", "host": ["{{base_url}}"], "path": ["api", "auth", "token"] }
+          },
+          "response": [
+            { "name": "200 - Token Issued", "code": 200, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"success\",\n  \"data\": {\n    \"token\": \"tok_a1b2c3d4e5f67890abcdef1234567890\",\n    \"token_type\": \"Bearer\",\n    \"business_id\": \"00000000-0000-0000-0000-000000000001\",\n    \"expires_in\": 86400\n  }\n}" },
+            { "name": "400 - Missing X-API-Key", "code": 400, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"missing_api_key\",\n    \"message\": \"X-API-Key header is required\"\n  }\n}" },
+            { "name": "401 - Invalid Key", "code": 401, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"invalid_api_key\",\n    \"message\": \"The provided API key is invalid\"\n  }\n}" },
+            { "name": "401 - Revoked Key", "code": 401, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"api_key_revoked\",\n    \"message\": \"This API key has been revoked\"\n  }\n}" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Customers",
+      "item": [
+        {
+          "name": "Create Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.status === 'success') {",
+                  "    pm.collectionVariables.set('customer_id', json.data.id);",
+                  "    pm.test('Customer created', function() {",
+                  "        pm.expect(json.data.email).to.eql('jane@example.com');",
+                  "        pm.expect(json.data.name).to.eql('Jane Doe');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"jane@example.com\",\n  \"name\": \"Jane Doe\"\n}" },
+            "url": { "raw": "{{base_url}}/api/customers", "host": ["{{base_url}}"], "path": ["api", "customers"] }
+          },
+          "response": [
+            { "name": "201 - Created", "code": 201, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"success\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"email\": \"jane@example.com\",\n    \"name\": \"Jane Doe\",\n    \"created_at\": \"2024-01-15T10:30:00Z\"\n  }\n}" },
+            { "name": "400 - Missing email field", "code": 400, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"validation_error\",\n    \"message\": \"email is required\"\n  }\n}" },
+            { "name": "400 - Invalid Email (regex)", "code": 400, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"invalid_email\",\n    \"message\": \"Email format is invalid\"\n  }\n}" },
+            { "name": "400 - Name Too Short", "code": 400, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"invalid_name\",\n    \"message\": \"Name must be at least 2 characters\"\n  }\n}" },
+            { "name": "401 - No Token", "code": 401, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"unauthorized\",\n    \"message\": \"Missing Authorization header\"\n  }\n}" },
+            { "name": "409 - Duplicate Email", "code": 409, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"customer_already_exists\",\n    \"message\": \"Customer with email 'jane@example.com' already exists\"\n  }\n}" }
+          ]
+        },
+        {
+          "name": "Get Customer",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/customers/{{customer_id}}", "host": ["{{base_url}}"], "path": ["api", "customers", "{{customer_id}}"] }
+          },
+          "response": [
+            { "name": "200 - Success", "code": 200, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"success\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"email\": \"jane@example.com\",\n    \"name\": \"Jane Doe\",\n    \"created_at\": \"2024-01-15T10:30:00Z\"\n  }\n}" },
+            { "name": "400 - Invalid UUID", "code": 400, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"invalid_id\",\n    \"message\": \"Invalid UUID format for customer_id\"\n  }\n}" },
+            { "name": "401 - No Token", "code": 401, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"unauthorized\",\n    \"message\": \"Missing Authorization header\"\n  }\n}" },
+            { "name": "404 - Not Found", "code": 404, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"customer_not_found\",\n    \"message\": \"Customer not found\"\n  }\n}" }
+          ]
+        },
+        {
+          "name": "List Customers",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/customers?limit=10&offset=0", "host": ["{{base_url}}"], "path": ["api", "customers"], "query": [{"key":"limit","value":"10"},{"key":"offset","value":"0"}] }
+          },
+          "response": [
+            { "name": "200 - Success", "code": 200, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"success\",\n  \"data\": [\n    {\n      \"id\": \"uuid\",\n      \"email\": \"jane@example.com\",\n      \"name\": \"Jane Doe\",\n      \"created_at\": \"2024-01-15T10:30:00Z\"\n    }\n  ]\n}" },
+            { "name": "401 - No Token", "code": 401, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"unauthorized\",\n    \"message\": \"Missing Authorization header\"\n  }\n}" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Invoices",
+      "item": [
+        {
+          "name": "Create Invoice",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.status === 'success') {",
+                  "    pm.collectionVariables.set('invoice_id', json.data.id);",
+                  "    pm.test('Invoice created', function() {",
+                  "        pm.expect(json.data.invoice_number).to.eql('INV-2024-001');",
+                  "        pm.expect(json.data.status).to.eql('pending');",
+                  "        pm.expect(json.data.amount_cents).to.eql(4500);",
+                  "        pm.expect(json.data.currency).to.eql('USD');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"customer_id\": \"{{customer_id}}\",\n  \"invoice_number\": \"INV-2024-001\",\n  \"line_items\": [\n    {\"description\": \"Widget\", \"quantity\": 2, \"unit_price_cents\": 1500},\n    {\"description\": \"Support\", \"quantity\": 1, \"unit_price_cents\": 1500}\n  ]\n}" },
+            "url": { "raw": "{{base_url}}/api/invoices", "host": ["{{base_url}}"], "path": ["api", "invoices"] }
+          },
+          "response": [
+            { "name": "201 - Created", "code": 201, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"success\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"invoice_number\": \"INV-2024-001\",\n    \"customer_id\": \"uuid\",\n    \"status\": \"pending\",\n    \"amount_cents\": 4500,\n    \"currency\": \"USD\",\n    \"due_date\": null,\n    \"line_items\": [\n      {\"id\":\"uuid\",\"description\":\"Widget\",\"quantity\":2,\"unit_price_cents\":1500,\"amount_cents\":3000},\n      {\"id\":\"uuid\",\"description\":\"Support\",\"quantity\":1,\"unit_price_cents\":1500,\"amount_cents\":1500}\n    ],\n    \"created_at\": \"2024-01-15T10:31:00Z\"\n  }\n}" },
+            { "name": "400 - Missing invoice_number", "code": 400, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"validation_error\",\n    \"message\": \"invoice_number is required\"\n  }\n}" },
+            { "name": "400 - Invalid invoice_number", "code": 400, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"invalid_invoice_number\",\n    \"message\": \"Invoice number must be alphanumeric (hyphens and underscores allowed)\"\n  }\n}" },
+            { "name": "400 - Missing quantity", "code": 400, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"validation_error\",\n    \"message\": \"quantity is required\"\n  }\n}" },
+            { "name": "400 - Missing Line Items", "code": 400, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"missing_line_items\",\n    \"message\": \"At least one line item is required\"\n  }\n}" },
+            { "name": "400 - Invalid Line Item", "code": 400, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"invalid_line_item\",\n    \"message\": \"Line item 1: quantity must be > 0\"\n  }\n}" },
+            { "name": "400 - Invalid Currency", "code": 400, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"invalid_currency\",\n    \"message\": \"Only USD currency is supported\"\n  }\n}" },
+            { "name": "401 - No Token", "code": 401, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"unauthorized\",\n    \"message\": \"Missing Authorization header\"\n  }\n}" },
+            { "name": "404 - Customer Not Found", "code": 404, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"customer_not_found\",\n    \"message\": \"Customer does not exist or does not belong to this business\"\n  }\n}" },
+            { "name": "409 - Duplicate Invoice Number", "code": 409, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"duplicate_invoice_number\",\n    \"message\": \"Invoice number 'INV-2024-001' already exists\"\n  }\n}" }
+          ]
+        },
+        {
+          "name": "Get Invoice",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/invoices/{{invoice_id}}", "host": ["{{base_url}}"], "path": ["api", "invoices", "{{invoice_id}}"] }
+          },
+          "response": [
+            { "name": "200 - Success", "code": 200, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"success\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"invoice_number\": \"INV-2024-001\",\n    \"customer_id\": \"uuid\",\n    \"status\": \"pending\",\n    \"amount_cents\": 4500,\n    \"currency\": \"USD\",\n    \"due_date\": null,\n    \"line_items\": [],\n    \"created_at\": \"2024-01-15T10:31:00Z\"\n  }\n}" },
+            { "name": "401 - No Token", "code": 401, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"unauthorized\",\n    \"message\": \"Missing Authorization header\"\n  }\n}" },
+            { "name": "404 - Not Found", "code": 404, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"invoice_not_found\",\n    \"message\": \"Invoice not found\"\n  }\n}" },
+            { "name": "404 - Endpoint Not Found (empty ID)", "code": 404, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"not_found\",\n    \"message\": \"The requested endpoint does not exist\"\n  }\n}" }
+          ]
+        },
+        {
+          "name": "List Invoices",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/invoices?status=pending&limit=50", "host": ["{{base_url}}"], "path": ["api", "invoices"], "query": [{"key":"status","value":"pending"},{"key":"limit","value":"50"}] }
+          },
+          "response": [
+            { "name": "200 - Success", "code": 200, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"success\",\n  \"data\": [\n    {\n      \"id\": \"uuid\",\n      \"invoice_number\": \"INV-2024-001\",\n      \"customer_id\": \"uuid\",\n      \"status\": \"pending\",\n      \"amount_cents\": 4500,\n      \"currency\": \"USD\",\n      \"due_date\": null,\n      \"line_items\": [],\n      \"created_at\": \"2024-01-15T10:31:00Z\"\n    }\n  ]\n}" },
+            { "name": "400 - Invalid Status", "code": 400, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"invalid_status\",\n    \"message\": \"Invalid status 'xyz'. Must be: pending, paid, failed, void\"\n  }\n}" },
+            { "name": "401 - No Token", "code": 401, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"unauthorized\",\n    \"message\": \"Missing Authorization header\"\n  }\n}" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Payments",
+      "item": [
+        {
+          "name": "Pay Invoice",
+          "description": "Tokens: tok_success, tok_card_declined, tok_insufficient_funds, tok_timeout, tok_network_error\n\nRequires Idempotency-Key header.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.status === 'success') {",
+                  "    pm.test('Payment processed', function() {",
+                  "        pm.expect(json.data.payment_id).to.not.be.undefined;",
+                  "        pm.expect(json.data.invoice_id).to.not.be.undefined;",
+                  "        pm.expect(['succeeded','failed']).to.include(json.data.status);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "pay-{{invoice_id}}-001" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"payment_token\": \"tok_success\"\n}" },
+            "url": { "raw": "{{base_url}}/api/invoices/{{invoice_id}}/pay", "host": ["{{base_url}}"], "path": ["api", "invoices", "{{invoice_id}}", "pay"] }
+          },
+          "response": [
+            { "name": "200 - Succeeded", "code": 200, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"success\",\n  \"data\": {\n    \"payment_id\": \"uuid\",\n    \"invoice_id\": \"uuid\",\n    \"status\": \"succeeded\",\n    \"amount_cents\": 4500,\n    \"failure_reason\": null,\n    \"created_at\": \"2024-01-15T10:32:00Z\"\n  }\n}" },
+            { "name": "200 - Failed (card_declined)", "code": 200, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"success\",\n  \"data\": {\n    \"payment_id\": \"uuid\",\n    \"invoice_id\": \"uuid\",\n    \"status\": \"failed\",\n    \"amount_cents\": 4500,\n    \"failure_reason\": \"card_declined\",\n    \"created_at\": \"2024-01-15T10:32:00Z\"\n  }\n}" },
+            { "name": "200 - Failed (PSP timeout)", "code": 200, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"success\",\n  \"data\": {\n    \"payment_id\": \"uuid\",\n    \"invoice_id\": \"uuid\",\n    \"status\": \"failed\",\n    \"amount_cents\": 4500,\n    \"failure_reason\": \"Payment processor unavailable, please retry\",\n    \"created_at\": \"2024-01-15T10:32:00Z\"\n  }\n}" },
+            { "name": "200 - Idempotent Retry (cached)", "code": 200, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"success\",\n  \"data\": {\n    \"payment_id\": \"uuid\",\n    \"invoice_id\": \"uuid\",\n    \"status\": \"succeeded\",\n    \"amount_cents\": 4500,\n    \"failure_reason\": null,\n    \"created_at\": \"2024-01-15T10:32:00Z\"\n  }\n}" },
+            { "name": "400 - Missing payment_token", "code": 400, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"validation_error\",\n    \"message\": \"payment_token is required\"\n  }\n}" },
+            { "name": "401 - No Token", "code": 401, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"unauthorized\",\n    \"message\": \"Missing Authorization header\"\n  }\n}" },
+            { "name": "404 - Invoice Not Found", "code": 404, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"invoice_not_found\",\n    \"message\": \"Invoice not found\"\n  }\n}" },
+            { "name": "404 - Endpoint Not Found (empty ID)", "code": 404, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"not_found\",\n    \"message\": \"The requested endpoint does not exist\"\n  }\n}" },
+            { "name": "409 - Already Paid", "code": 409, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"invoice_already_paid\",\n    \"message\": \"Invoice has already been paid\"\n  }\n}" },
+            { "name": "409 - Voided", "code": 409, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"invoice_voided\",\n    \"message\": \"Invoice has been voided\"\n  }\n}" },
+            { "name": "422 - Idempotency Mismatch", "code": 422, "header": [{"key":"Content-Type","value":"application/json"}], "body": "{\n  \"status\": \"error\",\n  \"error\": {\n    \"code\": \"idempotency_mismatch\",\n    \"message\": \"Idempotency key already used with a different request payload\"\n  }\n}" }
+          ]
+        }
+      ]
+    }
+  ]
+}
